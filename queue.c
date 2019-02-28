@@ -18,6 +18,9 @@
 #include "harness.h"
 #include "queue.h"
 
+static list_ele_t *alloc_ele(char *s);
+static void free_ele(list_ele_t *node);
+
 /*
   Create empty queue.
   Return NULL if could not allocate space.
@@ -25,16 +28,28 @@
 queue_t *q_new()
 {
     queue_t *q = malloc(sizeof(queue_t));
-    /* What if malloc returned NULL? */
+    if (q == NULL) {
+        goto end;
+    }
     q->head = NULL;
+    q->size = 0;
+    q->tail = NULL;
+end:
     return q;
 }
 
 /* Free all storage used by queue */
 void q_free(queue_t *q)
 {
-    /* How about freeing the list elements and the strings? */
-    /* Free queue structure */
+    if (q != NULL) {
+        list_ele_t *curr = q->head;
+        list_ele_t *next = NULL;
+        while (curr != NULL) {
+            next = curr->next;
+            free_ele(curr);
+            curr = next;
+        }
+    }
     free(q);
 }
 
@@ -47,16 +62,27 @@ void q_free(queue_t *q)
  */
 bool q_insert_head(queue_t *q, char *s)
 {
-    list_ele_t *newh;
-    /* What should you do if the q is NULL? */
-    newh = malloc(sizeof(list_ele_t));
-    /* Don't forget to allocate space for the string and copy it */
-    /* What if either call to malloc returns NULL? */
-    newh->next = q->head;
-    q->head = newh;
-    return true;
-}
+    bool success = false;
+    list_ele_t *newh = NULL;
 
+    if (q == NULL) {
+        goto end;
+    }
+    newh = alloc_ele(s);
+    if (newh == NULL) {
+        goto end;
+    }
+    if (q->size == 0) {
+        q->head = q->tail = newh;
+    } else {
+        newh->next = q->head;
+        q->head = newh;
+    }
+    q->size++;
+    success = true;
+end:
+    return success;
+}
 
 /*
   Attempt to insert element at tail of queue.
@@ -67,9 +93,27 @@ bool q_insert_head(queue_t *q, char *s)
  */
 bool q_insert_tail(queue_t *q, char *s)
 {
-    /* You need to write the complete code for this function */
-    /* Remember: It should operate in O(1) time */
-    return false;
+    bool success = false;
+    list_ele_t *node = NULL;
+
+    if (q == NULL) {
+        goto end;
+    }
+    node = alloc_ele(s);
+    if (node == NULL) {
+        goto end;
+    }
+    if (q->size == 0) {
+        // queue is empty, head & tail should be NULL
+        q->head = q->tail = node;
+    } else {
+        q->tail->next = node;
+        q->tail = node;
+    }
+    q->size++;
+    success = true;
+end:
+    return success;
 }
 
 /*
@@ -82,9 +126,24 @@ bool q_insert_tail(queue_t *q, char *s)
 */
 bool q_remove_head(queue_t *q, char *sp, size_t bufsize)
 {
-    /* You need to fix up this code. */
+    bool success = false;
+    if (q == NULL || q->size == 0) {
+        goto end;
+    }
+    list_ele_t *node = q->head;
+    if (sp != NULL) {
+        strncpy(sp, node->value, bufsize - 1);
+        sp[bufsize - 1] = '\0';
+    }
     q->head = q->head->next;
-    return true;
+    free_ele(node);
+    q->size--;
+    if (q->size == 0) {
+        q->tail = NULL;
+    }
+    success = true;
+end:
+    return success;
 }
 
 /*
@@ -93,9 +152,11 @@ bool q_remove_head(queue_t *q, char *sp, size_t bufsize)
  */
 int q_size(queue_t *q)
 {
-    /* You need to write the code for this function */
-    /* Remember: It should operate in O(1) time */
-    return 0;
+    if (q == NULL) {
+        return 0;
+    } else {
+        return q->size;
+    }
 }
 
 /*
@@ -107,5 +168,62 @@ int q_size(queue_t *q)
  */
 void q_reverse(queue_t *q)
 {
-    /* You need to write the code for this function */
+    if (q == NULL || q->size <= 1) {
+        return;
+    }
+    q->tail = q->head;
+
+    list_ele_t *last = NULL;
+    list_ele_t *curr = q->head;
+    list_ele_t *next = NULL;
+    while (curr != NULL) {
+        next = curr->next;
+        curr->next = last;
+
+        last = curr;
+        curr = next;
+    }
+    q->head = last;
+}
+
+/*
+  Attempt to allocate list_ele_t with givne string as value.
+  Return NULL if we could not allocate space for either list_ele_t or string.
+  Return pointer to list_ele_t if success.
+ */
+static list_ele_t *alloc_ele(char *s)
+{
+    list_ele_t *e = NULL;
+
+    e = malloc(sizeof(list_ele_t));
+    if (e == NULL) {
+        goto fail_ele;
+    }
+    // XXX: handle s is NULL
+    e->value = malloc(strlen(s) + 1);
+    if (e->value == NULL) {
+        goto fail_data;
+    }
+    // We allocate e->value according to length of s,
+    //   so it's safe to simply use strcpy here.
+    strcpy(e->value, s);
+    e->next = NULL;
+    return e;
+
+fail_data:
+    free(e);
+fail_ele:
+    return NULL;
+}
+
+
+/*
+  Free everything belong to node
+ */
+static void free_ele(list_ele_t *node)
+{
+    if (node != NULL) {
+        free(node->value);
+    }
+    free(node);
 }
